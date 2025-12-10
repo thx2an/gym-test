@@ -1,5 +1,5 @@
-const { sql } = require('../config/db');
-const { generateWorkoutPlan, generateNutritionPlan } = require('../services/geminiService');
+const { sql } = require('../../config/database');
+const GeminiService = require('../../Services/GeminiService');
 
 const createWorkoutPlan = async (req, res) => {
     try {
@@ -8,8 +8,8 @@ const createWorkoutPlan = async (req, res) => {
 
         // 1. Call Gemini Service
         // Construct a profile object
-        const userProfile = { age, gender, experience };
-        const planData = await generateWorkoutPlan(userProfile, goal, duration);
+        const userProfile = { age, gender, experience, goal }; // Added goal to profile
+        const planData = await GeminiService.generateWorkoutPlan(userProfile);
 
         // 2. Save to Database
         const pool = await sql.connect();
@@ -41,7 +41,7 @@ const createNutritionPlan = async (req, res) => {
         // 1. Call Gemini Service
         // We can pass preference as part of goal string or modify service to accept it
         const fullGoal = `${goal} (${dietaryPreference || 'No preference'})`;
-        const planData = await generateNutritionPlan({}, fullGoal);
+        const planData = await GeminiService.generateNutritionPlan({ goal: fullGoal });
 
         // 2. Save to Database
         const pool = await sql.connect();
