@@ -1,7 +1,7 @@
 const SessionQR = require('../../Models/SessionQR');
 const TrainingSession = require('../../Models/TrainingSession');
 const crypto = require('crypto');
-const { sql } = require('../../config/database');
+const { sql } = require('../../../config/database');
 
 class SessionController {
 

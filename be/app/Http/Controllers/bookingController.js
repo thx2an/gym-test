@@ -1,7 +1,7 @@
 const TrainingSession = require('../../Models/TrainingSession');
 const TrainerAvailability = require('../../Models/TrainerAvailability');
 const TrainerProfile = require('../../Models/TrainerProfile');
-const { sql } = require('../../config/database');
+const { sql } = require('../../../config/database');
 const SocketService = require('../../Services/SocketService');
 
 class BookingController {

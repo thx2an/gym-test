@@ -1,5 +1,5 @@
 const User = require('../../Models/User');
-const { sql } = require('../../config/database');
+const { sql } = require('../../../config/database');
 
 class UserController {
 

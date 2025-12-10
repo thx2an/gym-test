@@ -1,7 +1,7 @@
 const Payment = require('../../Models/Payment');
 const RefundRequest = require('../../Models/RefundRequest');
 const PayOSService = require('../../Services/PayOSService');
-const { sql } = require('../../config/database');
+const { sql } = require('../../../config/database');
 
 class PaymentController {
 

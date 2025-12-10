@@ -1,4 +1,4 @@
-const { sql } = require('../../config/database');
+const { sql } = require('../../../config/database');
 
 class StatisticsController {
 
