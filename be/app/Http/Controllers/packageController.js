@@ -1,40 +1,49 @@
-const { sql } = require('../config/db');
+const Package = require('../../Models/Package');
 
-// Get all packages
-const getAllPackages = async (req, res) => {
-    try {
-        const pool = await sql.connect();
-        const result = await pool.request().query('SELECT * FROM membership_packages ORDER BY price ASC');
-        res.json(result.recordset);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+class PackageController {
+    async getData(req, res) {
+        try {
+            const data = await Package.all();
+            res.json({ status: true, data });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ status: false, message: 'Server Error' });
+        }
     }
-};
 
-// Create Package
-const createPackage = async (req, res) => {
-    try {
-        const { code, name, description, duration_days, price, benefits } = req.body;
-
-        const pool = await sql.connect();
-        await pool.request()
-            .input('code', sql.NVarChar, code)
-            .input('name', sql.NVarChar, name)
-            .input('desc', sql.NVarChar, description)
-            .input('dur', sql.Int, duration_days)
-            .input('price', sql.Decimal, price)
-            .input('ben', sql.NVarChar, benefits)
-            .query(`
-                INSERT INTO membership_packages (code, name, description, duration_days, price, benefits)
-                VALUES (@code, @name, @desc, @dur, @price, @ben)
-            `);
-
-        res.status(201).json({ message: 'Package created successfully' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+    async create(req, res) {
+        try {
+            // HiTravel-1 uses request body directly.
+            // gym-nexus uses specific fields.
+            await Package.create(req.body);
+            res.json({ status: true, message: 'Thêm gói tập thành công' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ status: false, message: 'Server Error' });
+        }
     }
-};
 
-module.exports = { getAllPackages, createPackage };
+    async update(req, res) {
+        try {
+            const id = req.params.id || req.body.id;
+            await Package.update(id, req.body);
+            res.json({ status: true, message: 'Cập nhật gói tập thành công' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ status: false, message: 'Server Error' });
+        }
+    }
+
+    async destroy(req, res) {
+        try {
+            const id = req.params.id || req.body.id;
+            await Package.delete(id);
+            res.json({ status: true, message: 'Xóa gói tập thành công' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ status: false, message: 'Server Error' });
+        }
+    }
+}
+
+module.exports = new PackageController();

@@ -1,48 +1,64 @@
-const { sql } = require('../config/db');
+const User = require('../../Models/User');
+const { sql } = require('../../config/database');
 
-// Get current user profile
-const getProfile = async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const pool = await sql.connect();
+class UserController {
 
-        const result = await pool.request()
-            .input('id', sql.BigInt, userId)
-            .query('SELECT user_id, full_name, email, phone, gender, date_of_birth, created_at FROM users WHERE user_id = @id');
+    // Mimics NguoiDungController.thongTinNguoiDung
+    async getProfile(req, res) {
+        try {
+            // req.user is set by middleware
+            if (!req.user) {
+                return res.status(401).json({ status: 0, message: 'Token invalid' });
+            }
 
-        if (result.recordset.length === 0) return res.status(404).json({ message: 'User not found' });
-
-        res.json(result.recordset[0]);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+            const user = await User.findById(req.user.id);
+            if (user) {
+                return res.json({ status: 1, data: user });
+            }
+            return res.status(404).json({ status: 0, message: 'User not found' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ status: 0, message: 'Server Error' });
+        }
     }
-};
 
-// Update profile
-const updateProfile = async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const { full_name, phone, gender, date_of_birth } = req.body;
+    // Mimics NguoiDungController.suaNguoiDung
+    async updateProfile(req, res) {
+        try {
+            if (!req.user) {
+                return res.status(401).json({ status: 0, message: 'Token invalid' });
+            }
 
-        const pool = await sql.connect();
-        await pool.request()
-            .input('id', sql.BigInt, userId)
-            .input('name', sql.NVarChar, full_name)
-            .input('phone', sql.NVarChar, phone)
-            .input('gender', sql.NVarChar, gender)
-            .input('dob', sql.Date, date_of_birth) // Format YYYY-MM-DD
-            .query(`
-                UPDATE users 
-                SET full_name = @name, phone = @phone, gender = @gender, date_of_birth = @dob 
-                WHERE user_id = @id
-            `);
+            const userId = req.user.id;
+            const { full_name, phone, gender, date_of_birth } = req.body;
 
-        res.json({ message: 'Profile updated successfully' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+            const pool = await sql.connect();
+            await pool.request()
+                .input('id', sql.BigInt, userId)
+                .input('name', sql.NVarChar, full_name)
+                .input('phone', sql.NVarChar, phone)
+                .input('gender', sql.NVarChar, gender)
+                .input('dob', sql.Date, date_of_birth)
+                .query(`
+                    UPDATE users 
+                    SET full_name = @name, phone = @phone, gender = @gender, date_of_birth = @dob 
+                    WHERE user_id = @id
+                `);
+
+            // Fetch updated
+            const updatedUser = await User.findById(userId);
+
+            res.json({
+                status: true,
+                message: 'Cập nhật thông tin thành công',
+                data: updatedUser
+            });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ status: 0, message: 'Server Error' });
+        }
     }
-};
+}
 
-module.exports = { getProfile, updateProfile };
+module.exports = new UserController();
