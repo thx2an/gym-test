@@ -5,10 +5,14 @@ const { connectDB } = require('./config/database');
 const apiRoutes = require('./routes/api');
 
 const app = express();
+const path = require('path');
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Static Files (for uploads)
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // Connect DB
 connectDB();

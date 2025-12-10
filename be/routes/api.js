@@ -54,4 +54,13 @@ router.post('/payment/confirm', verifyToken, PaymentController.confirmPayment); 
 router.post('/payment/refund/request', verifyToken, PaymentController.requestRefund);
 router.get('/payment/refunds', verifyToken, isAdmin, PaymentController.getRefunds);
 
+// --- Review Routes ---
+const ReviewController = require('../app/Http/Controllers/ReviewController');
+router.post('/reviews/add', verifyToken, ReviewController.addReview);
+router.get('/reviews/trainer/:trainerId', ReviewController.getTrainerReviews);
+
+// --- Upload Routes ---
+const UploadController = require('../app/Http/Controllers/UploadController');
+router.post('/upload/image', verifyToken, UploadController.uploader, UploadController.uploadImage);
+
 module.exports = router;

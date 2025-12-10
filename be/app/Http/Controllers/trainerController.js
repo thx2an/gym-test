@@ -24,6 +24,14 @@ class TrainerController {
 
     async getTrainers(req, res) {
         try {
+            // Check if filters exist
+            const { gender, minExp, specialization } = req.query;
+
+            if (gender || minExp || specialization) {
+                const trainers = await TrainerProfile.getTrainersWithFilter({ gender, minExp, specialization });
+                return res.json({ status: true, data: trainers });
+            }
+
             const trainers = await TrainerProfile.getAllWithUser();
             res.json({ status: true, data: trainers });
         } catch (error) {

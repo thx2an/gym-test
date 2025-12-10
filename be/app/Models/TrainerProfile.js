@@ -47,6 +47,38 @@ class TrainerProfile {
         `);
         return result.recordset;
     }
+
+    // New Filtering Method
+    static async getTrainersWithFilter(filters) {
+        const pool = await sql.connect();
+        let query = `
+            SELECT t.trainer_id, t.specialization, t.bio, t.experience_years, u.full_name, u.email, u.gender
+            FROM trainer_profiles t
+            JOIN users u ON t.user_id = u.user_id
+            WHERE 1=1
+        `;
+        const request = pool.request();
+
+        if (filters.gender) {
+            query += " AND u.gender = @gender";
+            request.input('gender', sql.NVarChar, filters.gender);
+        }
+
+        if (filters.minExp) {
+            query += " AND t.experience_years >= @minExp";
+            request.input('minExp', sql.Int, filters.minExp);
+        }
+
+        if (filters.specialization) {
+            query += " AND t.specialization LIKE @spec";
+            request.input('spec', sql.NVarChar, `%${filters.specialization}%`);
+        }
+
+        // Add more filters as needed
+
+        const result = await request.query(query);
+        return result.recordset;
+    }
 }
 
 module.exports = TrainerProfile;
