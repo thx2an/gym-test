@@ -18,8 +18,30 @@ import MyBookings from './pages/member/MyBookings';
 import AIPlanner from './pages/member/AIPlanner';
 
 // Placeholder for protected dashboard
+import AdminDashboard from './pages/admin/AdminDashboard';
+import { jwtDecode } from "jwt-decode";
+
+// Dashboard Logic
 const Dashboard = () => {
-  return <Navigate to="/my-membership" />;
+  const { token } = useContext(AuthContext);
+  if (!token) return <Navigate to="/login" />;
+
+  try {
+    const decoded = jwtDecode(token); // Assuming token has role. Or use UserProfile context.
+    // Simplify: fetch user role or checks.
+    // If Admin -> AdminDashboard, else -> MyMembership
+    // For now, let's just return AdminDashboard if URL is /, or redirect based on stored user info
+    // But we don't have role in context comfortably yet.
+    // Let's assume we store user in localStorage or AuthContext
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+    if (user.role === 'ADMIN' || user.role === 'STAFF') {
+      return <AdminDashboard />;
+    }
+    return <Navigate to="/my-membership" />;
+  } catch (e) {
+    return <Navigate to="/login" />;
+  }
 };
 
 const ProtectedRoute = ({ children }) => {
@@ -45,6 +67,7 @@ function App() {
             <Route path="/" element={
               <ProtectedRoute>
                 <Dashboard />
+                {/* Note: logic inside Dashboard (placeholder in App.jsx) needs update or use AdminDashboard directly */}
               </ProtectedRoute>
             } />
             <Route path="/admin/branches" element={

@@ -7,10 +7,21 @@ export default {
     theme: {
         extend: {
             colors: {
-                primary: '#E11D48', // Example Rose-600
-                secondary: '#0F172A', // Example Slate-900
-                accent: '#F43F5E',
+                primary: {
+                    50: '#fff1f2',
+                    100: '#ffe4e6',
+                    500: '#f43f5e',
+                    600: '#e11d48', // Brand
+                    700: '#be123c',
+                },
+                slate: {
+                    800: '#1e293b',
+                    900: '#0f172a', // Text Dark
+                }
             },
+            fontFamily: {
+                sans: ['Inter', 'sans-serif'],
+            }
         },
     },
     plugins: [],
