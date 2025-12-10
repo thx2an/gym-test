@@ -1,186 +1,117 @@
-const { sql } = require('../config/db');
+const TrainingSession = require('../../Models/TrainingSession');
+const TrainerAvailability = require('../../Models/TrainerAvailability');
+const TrainerProfile = require('../../Models/TrainerProfile');
+const { sql } = require('../../config/database');
 
-// Helper to check if a slot is booked
-const isSlotBooked = async (pool, trainerId, date, startTime) => {
-    // Check training_sessions for overlap
-    // Assuming 1 hour sessions for simplicity, or we check exact start_time
-    // In real app, we check ranges. Here, assume fixed slots.
-    const res = await pool.request()
-        .input('tid', sql.BigInt, trainerId)
-        .input('start', sql.DateTime, startTime) // startTime acts as the unique slot identifier here
-        .query(`
-            SELECT session_id FROM training_sessions 
-            WHERE trainer_id = @tid 
-            AND status IN ('confirmed', 'pending')
-            AND start_time = @start
-        `);
-    return res.recordset.length > 0;
-};
+class BookingController {
 
-const getAvailableSlots = async (req, res) => {
-    try {
-        const { trainerId, date } = req.query; // date format: YYYY-MM-DD
-        if (!trainerId || !date) return res.status(400).json({ message: 'Missing trainerId or date' });
+    // Logic from gym-nexus getAvailableSlots
+    async getAvailableSlots(req, res) {
+        try {
+            const { trainerId, date } = req.query;
+            if (!trainerId || !date) return res.status(400).json({ status: false, message: 'Missing trainerId or date' });
 
-        const pool = await sql.connect();
+            const inputDate = new Date(date);
+            const dayOfWeek = inputDate.getDay();
 
-        // 1. Get Trainer's Defined Availability for this day (or recurring)
-        // Convert input date to DayOfWeek (0=Sun, 1=Mon, etc.)
-        // SQL Server DATEPART(dw, date) returns 1 for Sunday by default (US), depends on SET DATEFIRST.
-        // Let's rely on JS to get day of week.
-        const inputDate = new Date(date);
-        const dayOfWeek = inputDate.getDay(); // 0-6 (Sun-Sat)
+            // 1. Get Availability
+            const availRanges = await TrainerAvailability.findByTrainerAndParams(trainerId, date, dayOfWeek);
+            let availableSlots = [];
 
-        // Fetch availability ranges
-        const availRes = await pool.request()
-            .input('tid', sql.BigInt, trainerId)
-            .input('date', sql.Date, date)
-            .input('dow', sql.TinyInt, dayOfWeek)
-            .query(`
-                SELECT * FROM trainer_availability 
-                WHERE trainer_id = @tid 
-                AND is_blocked = 0
-                AND (
-                    (is_recurring = 1 AND day_of_week = @dow)
-                    OR 
-                    (is_recurring = 0 AND date = @date)
-                )
-            `);
+            // 2. Generate slots
+            for (const range of availRanges) {
+                let start = new Date(range.start_time);
+                let end = new Date(range.end_time);
+                let current = new Date(start);
 
-        const availabilityRanges = availRes.recordset;
-        let availableSlots = [];
+                while (current < end) {
+                    const slotTime = new Date(date);
+                    slotTime.setHours(current.getUTCHours(), current.getUTCMinutes(), 0, 0);
 
-        // 2. Generate slots (hourly) from ranges
-        for (const range of availabilityRanges) {
-            // Assume start_time and end_time are Date objects (from driver) or strings
-            // We need to parse time part. 
-            // SQL Time type comes as Date object with 1970-01-01 usually.
+                    const slotEnd = new Date(slotTime);
+                    slotEnd.setHours(slotEnd.getHours() + 1);
 
-            let start = new Date(range.start_time);
-            let end = new Date(range.end_time);
+                    // Boundary Check
+                    if (slotEnd <= new Date(date + 'T' + range.end_time.toISOString().split('T')[1])) {
 
-            // Should normalize to purely time based loop
-            let current = new Date(start);
+                        // Check if booked
+                        const booked = await TrainingSession.findByTrainerAndStart(trainerId, slotTime);
 
-            while (current < end) {
-                // Determine slot actual datetime
-                const slotTime = new Date(date);
-                slotTime.setHours(current.getUTCHours(), current.getUTCMinutes(), 0, 0);
-
-                // Slot end time (assume 60 min session)
-                const slotEnd = new Date(slotTime);
-                slotEnd.setHours(slotEnd.getHours() + 1);
-
-                if (slotEnd <= new Date(date + 'T' + range.end_time.toISOString().split('T')[1])) {
-                    // Just simple check logic: checks if slot is taken
-                    // Need correct formatting for SQL query
-                    const isBooked = await isSlotBooked(pool, trainerId, date, slotTime);
-
-                    if (!isBooked) {
-                        availableSlots.push({
-                            time: current.toISOString().split('T')[1].substring(0, 5), // HH:MM
-                            datetime: slotTime
-                        });
+                        if (booked.length === 0) {
+                            availableSlots.push({
+                                time: current.toISOString().split('T')[1].substring(0, 5),
+                                datetime: slotTime
+                            });
+                        }
                     }
+                    current.setHours(current.getHours() + 1);
                 }
-
-                // Increment 1 hour
-                current.setHours(current.getHours() + 1);
             }
+
+            const uniqueSlots = [...new Map(availableSlots.map(item => [item.time, item])).values()];
+            uniqueSlots.sort((a, b) => a.time.localeCompare(b.time));
+
+            res.json({ status: true, data: uniqueSlots });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ status: false, message: 'Server Error' });
         }
-
-        // Remove duplicates if any ranges overlap (basic safety)
-        const uniqueSlots = [...new Map(availableSlots.map(item => [item.time, item])).values()];
-
-        // Sort
-        uniqueSlots.sort((a, b) => a.time.localeCompare(b.time));
-
-        res.json(uniqueSlots);
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
     }
-};
 
-const createBooking = async (req, res) => {
-    try {
-        const { trainerId, startTime, notes } = req.body; // startTime is full ISO datetime
-        const memberId = req.user.id;
+    async createBooking(req, res) {
+        try {
+            const { trainerId, startTime, notes } = req.body;
+            const memberId = req.user.id; // User from token
 
-        const pool = await sql.connect();
+            // Check availability
+            const isTaken = await TrainingSession.findByTrainerAndStart(trainerId, startTime);
+            if (isTaken.length > 0) {
+                return res.status(409).json({ status: false, message: 'Slot already booked' });
+            }
 
-        // Check availability again (race condition)
-        const isTaken = await pool.request()
-            .input('tid', sql.BigInt, trainerId)
-            .input('start', sql.DateTime, startTime)
-            .query(`
-                SELECT session_id FROM training_sessions 
-                WHERE trainer_id = @tid 
-                AND status IN ('confirmed', 'pending')
-                AND start_time = @start
-            `);
+            // Get Branch
+            const branchRes = await TrainerAvailability.getTrainerBranch(trainerId); // Assumes userId logic in Model needs Fix or trainerId->UserId lookup
+            // Actually, TrainerAvailability.getTrainerBranch takes userId. 
+            // We need a way to get UserID from TrainerID or just query availability table for branch.
+            // Simplified: Query Trainer Profiles/Availability to find branch.
 
-        if (isTaken.recordset.length > 0) {
-            return res.status(409).json({ message: 'Slot already booked' });
+            // Fix: Re-query for branch using TrainerID from availability table directly or just use default 1
+            const pool = await sql.connect();
+            const branchQ = await pool.request().input('tid', sql.BigInt, trainerId).query("SELECT TOP 1 branch_id FROM trainer_availability WHERE trainer_id = @tid");
+            const branchId = branchQ.recordset.length > 0 ? branchQ.recordset[0].branch_id : 1;
+
+            const start = new Date(startTime);
+            const end = new Date(start);
+            end.setHours(end.getHours() + 1);
+
+            await TrainingSession.create({
+                member_id: memberId,
+                trainer_id: trainerId,
+                branch_id: branchId, // found or default
+                start_time: start,
+                end_time: end,
+                notes: notes
+            });
+
+            res.json({ status: true, message: 'Booking successful' });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ status: false, message: 'Server Error' });
         }
-
-        // Get Branch (assume Trainer's primary branch or pass in body)
-        // For now, lookup trainer branch via availability or profile lookup
-        // We'll just look up where the trainer generally works.
-        const branchRes = await pool.request().input('tid', sql.BigInt, trainerId).query(`
-            SELECT TOP 1 branch_id FROM trainer_availability WHERE trainer_id = @tid
-        `);
-        // If no availability set, maybe look at user_branch... fallback to 1
-        const branchId = branchRes.recordset.length > 0 ? branchRes.recordset[0].branch_id : 1;
-
-        // Calculate EndTime (Assume 1 hour)
-        const start = new Date(startTime);
-        const end = new Date(start);
-        end.setHours(end.getHours() + 1);
-
-        await pool.request()
-            .input('memId', sql.BigInt, memberId)
-            .input('tid', sql.BigInt, trainerId)
-            .input('bid', sql.Int, branchId)
-            .input('start', sql.DateTime, start)
-            .input('end', sql.DateTime, end)
-            .input('notes', sql.NVarChar, notes)
-            .query(`
-                INSERT INTO training_sessions (member_id, trainer_id, branch_id, start_time, end_time, status, notes)
-                VALUES (@memId, @tid, @bid, @start, @end, 'confirmed', @notes)
-            `);
-        // Status confirmed immediately for simplicity, could be pending payment if needed.
-
-        res.json({ message: 'Booking successful' });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
     }
-};
 
-const getMyBookings = async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const pool = await sql.connect();
-
-        const result = await pool.request()
-            .input('uid', sql.BigInt, userId)
-            .query(`
-                SELECT s.*, u.full_name as trainer_name 
-                FROM training_sessions s
-                JOIN trainer_profiles tp ON s.trainer_id = tp.trainer_id
-                JOIN users u ON tp.user_id = u.user_id
-                WHERE s.member_id = @uid
-                ORDER BY s.start_time DESC
-            `);
-
-        res.json(result.recordset);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+    async getMyBookings(req, res) {
+        try {
+            const userId = req.user.id;
+            const bookings = await TrainingSession.getByMember(userId);
+            res.json({ status: true, data: bookings });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ status: false, message: 'Server Error' });
+        }
     }
-};
+}
 
-module.exports = { getAvailableSlots, createBooking, getMyBookings };
+module.exports = new BookingController();
