@@ -12,9 +12,12 @@ const PaymentController = require('../app/Http/Controllers/PaymentController');
 
 const { verifyToken, isAdmin } = require('../app/Http/Middleware/AuthMiddleware');
 
+const validate = require('../app/Http/Middleware/ValidateRequest');
+const { registerRules, loginRules } = require('../app/Http/Requests/AuthRequest');
+
 // --- Auth Routes (Public) ---
-router.post('/auth/register', AuthController.register);
-router.post('/auth/login', AuthController.login);
+router.post('/auth/register', registerRules, validate, AuthController.register);
+router.post('/auth/login', loginRules, validate, AuthController.login);
 
 // --- User Routes (Protected) ---
 router.get('/user/profile', verifyToken, UserController.getProfile);
@@ -62,5 +65,19 @@ router.get('/reviews/trainer/:trainerId', ReviewController.getTrainerReviews);
 // --- Upload Routes ---
 const UploadController = require('../app/Http/Controllers/UploadController');
 router.post('/upload/image', verifyToken, UploadController.uploader, UploadController.uploadImage);
+
+router.post('/upload/image', verifyToken, UploadController.uploader, UploadController.uploadImage);
+
+// --- Statistics Routes (Admin) ---
+const StatisticsController = require('../app/Http/Controllers/StatisticsController');
+router.get('/admin/dashboard-stats', verifyToken, isAdmin, StatisticsController.getDashboardStats);
+
+// --- Blog Routes ---
+const BlogController = require('../app/Http/Controllers/BlogController');
+router.get('/blog/categories', BlogController.getCategories);
+router.post('/blog/category', verifyToken, isAdmin, BlogController.createCategory);
+router.get('/blog/posts', BlogController.getPosts);
+router.get('/blog/post/:id', BlogController.getPostDetail);
+router.post('/blog/post', verifyToken, isAdmin, BlogController.createPost);
 
 module.exports = router;

@@ -2,6 +2,7 @@ const TrainingSession = require('../../Models/TrainingSession');
 const TrainerAvailability = require('../../Models/TrainerAvailability');
 const TrainerProfile = require('../../Models/TrainerProfile');
 const { sql } = require('../../config/database');
+const SocketService = require('../../Services/SocketService');
 
 class BookingController {
 
@@ -93,6 +94,22 @@ class BookingController {
                 end_time: end,
                 notes: notes
             });
+
+            // Notify Trainer
+            const userRes = await TrainerProfile.findByUserId(trainerId); // Assuming we can get user_id from trainer_id here? No, trainerId IS TrainerProfile ID usually.
+            // Correction: BookingController.createBooking receives `trainerId` (from query/body). 
+            // In Models/TrainingSession.js `create` uses it as `trainer_id`. 
+            // To notify, we need the `user_id` of that trainer.
+
+            // Getting user_id from trainer_id (if trainerId is indeed profile ID)
+            // Or if FE sends UserID of trainer. Let's assume input trainerId is ProfileID.
+            // Need a lookup. For speed, just emitting to a room named 'trainer_{trainerId}' is easier if FE joins that.
+            // Let's stick to user_id for consistency.
+
+            const tUser = await pool.request().input('tid', sql.BigInt, trainerId).query("SELECT user_id FROM trainer_profiles WHERE trainer_id = @tid");
+            if (tUser.recordset.length > 0) {
+                SocketService.notifyUser(tUser.recordset[0].user_id, 'new_booking', { message: 'You have a new booking!', time: startTime });
+            }
 
             res.json({ status: true, message: 'Booking successful' });
 
