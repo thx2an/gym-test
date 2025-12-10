@@ -13,7 +13,7 @@ const PackagesList = () => {
         console.log('PackagesList: Fetching packages...');
         const fetchPackages = async () => {
             try {
-                const res = await axiosClient.get('/membership/packages');
+                const res = await axiosClient.get('/packages');
                 // Filter only active packages if needed, but backend sends all.
                 // Ideally, backend should have a separate public endpoint or filter logic.
                 setPackages(res.data);

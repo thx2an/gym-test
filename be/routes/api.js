@@ -44,7 +44,7 @@ router.get('/trainer/schedule/:trainerId', TrainerController.getSchedule);
 // --- Booking Routes ---
 router.get('/booking/slots', verifyToken, BookingController.getAvailableSlots); // ?trainerId=x&date=y
 router.post('/booking/create', verifyToken, BookingController.createBooking);
-router.get('/my-bookings', verifyToken, BookingController.getMyBookings);
+router.get('/booking/my-bookings', verifyToken, BookingController.getMyBookings);
 
 // --- Session/QR Routes ---
 router.get('/session/qr/:sessionId', verifyToken, SessionController.getSessionQR);
@@ -66,7 +66,7 @@ router.get('/reviews/trainer/:trainerId', ReviewController.getTrainerReviews);
 const UploadController = require('../app/Http/Controllers/UploadController');
 router.post('/upload/image', verifyToken, UploadController.uploader, UploadController.uploadImage);
 
-router.post('/upload/image', verifyToken, UploadController.uploader, UploadController.uploadImage);
+
 
 // --- Statistics Routes (Admin) ---
 const StatisticsController = require('../app/Http/Controllers/StatisticsController');

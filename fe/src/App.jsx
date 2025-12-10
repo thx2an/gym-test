@@ -33,7 +33,7 @@ const Dashboard = () => {
     // For now, let's just return AdminDashboard if URL is /, or redirect based on stored user info
     // But we don't have role in context comfortably yet.
     // Let's assume we store user in localStorage or AuthContext
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = JSON.parse(localStorage.getItem('USER_INFO') || '{}');
 
     if (user.role === 'ADMIN' || user.role === 'STAFF') {
       return <AdminDashboard />;
